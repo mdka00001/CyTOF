@@ -1,0 +1,4 @@
+roi_id,sample_name,patient_id,indication,batch
+sample_001,Sample_A,Patient_A,control,batch_1
+sample_002,Sample_A,Patient_A,control,batch_1
+sample_003,Sample_B,Patient_B,treated,batch_2
