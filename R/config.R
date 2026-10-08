@@ -7,7 +7,7 @@ default_config <- function() list(input = NULL, samples = NULL, output = NULL,
   exclude = '', image_channels = '', skip_images = FALSE, skip_embeddings = FALSE)
 
 help_text <- function() {
-  cat('CyTOF QC\nUsage: Rscript bin/cytof-qc.R --input DIR --samples mapping.csv --output DIR [options]\n\n')
+  cat('CyTOF QC\nUsage: cytof-qc --input DIR --samples mapping.csv --output DIR [options]\n\n')
   cat('Mapping requires roi_id,sample_name; optional columns are retained.\n')
   for (n in names(default_config())) cat(sprintf('  --%-20s %s\n', gsub('_', '-', n), default_config()[[n]] %||% '(required)'))
   cat('\nBoolean switches take no value. Transform choices: arcsinh,arcsinh_zscore,rlog,rlog_zscore.\nSee README.md for input layout, rlog restrictions and output schemas.\n')
