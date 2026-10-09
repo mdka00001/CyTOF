@@ -2,7 +2,7 @@ default_config <- function() list(input = NULL, samples = NULL, output = NULL,
   intensities = 'intensities', regionprops = 'regionprops', images = 'img', masks = 'masks',
   transforms = 'arcsinh,arcsinh_zscore', cofactor = 1, min_area = 5,
   pixel_size = 1, seed = 220225, plot_cells = 5000, heatmap_cells = 500,
-  embedding_cells = 30000, snr_cells = 30000, neighbors = 15, perplexity = 30,
+  embedding_cells = 0, snr_cells = 30000, neighbors = 15, perplexity = 30,
   rlog_max_cells = 1000, low_snr = 2, high_snr = 10, min_signal = 2,
   exclude = '', image_channels = '', skip_images = FALSE, skip_embeddings = FALSE)
 
@@ -31,15 +31,17 @@ parse_args <- function(args) {
   for (key in nums) if (!is.finite(cfg[[key]]) || cfg[[key]] < 0) stop('Invalid nonnegative number: ', key)
   for (key in c('cofactor','pixel_size','perplexity')) if (cfg[[key]] <= 0) stop(key, ' must be positive')
   for (key in c('seed','plot_cells','heatmap_cells','embedding_cells','snr_cells','neighbors','rlog_max_cells'))
-    if (cfg[[key]] != floor(cfg[[key]]) || (key != 'seed' && cfg[[key]] < 2)) stop('Invalid integer: ', key)
+    if (cfg[[key]] != floor(cfg[[key]]) || (!key %in% c('seed','embedding_cells') && cfg[[key]] < 2)) stop('Invalid integer: ', key)
   cfg$transforms <- unique(split_list(cfg$transforms))
   if (!length(cfg$transforms) || any(!cfg$transforms %in% c('arcsinh','arcsinh_zscore','rlog','rlog_zscore'))) stop('Invalid transforms')
   cfg
 }
 check_dependencies <- function(cfg) {
-  packages <- 'mclust'
-  if (!cfg$skip_embeddings) packages <- c(packages, 'uwot', 'Rtsne')
-  if (!cfg$skip_images) packages <- c(packages, 'EBImage', 'tiff')
+  packages <- c('mclust','dittoSeq','SingleCellExperiment','S4Vectors','SummarizedExperiment',
+    'ggplot2','patchwork','ggrastr','viridis','RColorBrewer')
+  if (!nzchar(Sys.which('pdfunite'))) stop('Missing pdfunite: install Poppler utilities (poppler-utils on Ubuntu).')
+  if (!cfg$skip_embeddings) packages <- c(packages, 'uwot', 'Rtsne', 'scater')
+  if (!cfg$skip_images) packages <- c(packages, 'EBImage', 'tiff', 'cytomapper')
   if (any(grepl('rlog', cfg$transforms))) packages <- c(packages, 'DESeq2', 'SummarizedExperiment')
   missing <- packages[!vapply(packages, requireNamespace, logical(1), quietly=TRUE)]
   if (length(missing)) stop('Missing packages: ', paste(missing, collapse=', '), '. Run Rscript scripts/install.R')

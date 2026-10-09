@@ -41,15 +41,17 @@ roi_metrics <- function(data, cfg) {
 compute_embeddings <- function(x, use, cfg, idx) {
   selected <- use & apply(x, 1, stats::sd) > 0
   if (sum(selected) < 2 || length(idx) < 5) stop('Embeddings require at least 2 variable selected markers and 5 cells; use --skip-embeddings')
-  v <- t(x[selected,idx,drop=FALSE]); n <- nrow(v)
-  pc <- stats::prcomp(v, center=TRUE, scale.=FALSE, rank.=min(30,n-1,ncol(v)))$x
-  set.seed(cfg$seed)
-  umap <- uwot::umap(pc, n_neighbors=min(cfg$neighbors,n-1), n_components=2,
-                    n_threads=1, n_sgd_threads=1, verbose=FALSE, init='random')
+  object <- SingleCellExperiment::SingleCellExperiment(assays=list(exprs=x[,idx,drop=FALSE]))
+  n <- length(idx)
   perplexity <- min(cfg$perplexity, (n-2)/3)
   set.seed(cfg$seed)
-  tsne <- Rtsne::Rtsne(pc, dims=2, perplexity=perplexity, pca=FALSE,
-                      check_duplicates=FALSE, num_threads=1)$Y
-  list(UMAP=umap, TSNE=tsne, cell_id=colnames(x)[idx],
-       markers=rownames(x)[selected], perplexity=perplexity, neighbors=min(cfg$neighbors,n-1))
+  object <- scater::runUMAP(object, subset_row=selected, exprs_values='exprs',
+    n_neighbors=min(cfg$neighbors,n-1), n_threads=1, n_sgd_threads=1)
+  set.seed(cfg$seed)
+  object <- scater::runTSNE(object, subset_row=selected, exprs_values='exprs',
+    perplexity=perplexity, num_threads=1)
+  list(UMAP=SingleCellExperiment::reducedDim(object,'UMAP'),
+       TSNE=SingleCellExperiment::reducedDim(object,'TSNE'), cell_id=colnames(x)[idx],
+       markers=rownames(x)[selected], perplexity=perplexity, neighbors=min(cfg$neighbors,n-1),
+       engine='scater::runUMAP / scater::runTSNE')
 }

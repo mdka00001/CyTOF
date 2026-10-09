@@ -18,9 +18,9 @@ Rscript bin/cytof-qc.R \
 
 On the current workstation, use `/usr/bin/Rscript` for these commands: it has the required packages. The `Rscript` on the default PATH points to a separate Miniconda R installation.
 
-Use an empty/new output directory. `Rscript bin/cytof-qc.R --help` lists all options and defaults. Paths are resolved relative to your working directory; the executable itself can be invoked from anywhere. Installation may need system development libraries for TIFF, FFTW and the Bioconductor dependencies; installation errors identify missing libraries. Neither Pandoc nor LaTeX is needed.
+Use an empty/new output directory. `Rscript bin/cytof-qc.R --help` lists all options and defaults. Paths are resolved relative to your working directory; the executable itself can be invoked from anywhere. Installation may need system development libraries for TIFF, FFTW and the Bioconductor dependencies; installation errors identify missing libraries. Neither Pandoc nor LaTeX is needed. Install Poppler utilities (`sudo apt-get install poppler-utils` on Ubuntu) for `pdfunite`, which assembles report pages of different sizes.
 
-Dependencies: `mclust` for cell SNR; `uwot` and `Rtsne` for embeddings; `EBImage` and `tiff` for image QC; `DESeq2` for optional rlog. `--skip-images` and `--skip-embeddings` explicitly disable those modules and their dependency checks. Skipped modules are identified in the report.
+Dependencies: `mclust` for cell SNR; `scater` with `uwot` and `Rtsne` for embeddings; `dittoSeq`, `SingleCellExperiment`, `patchwork`, `ggrastr`, `ggplot2`, `viridis` and `RColorBrewer` for the reference-script plots; `EBImage`, `tiff` and `cytomapper` for image QC; `DESeq2` for optional rlog. `--skip-images` and `--skip-embeddings` explicitly disable those modules and their dependency checks. Skipped modules are identified in the report.
 
 ## Input contract
 
@@ -34,7 +34,7 @@ steinbock/
   masks/ROI_ID.tiff
 ```
 
-- `panel.csv`: `channel,name`, optionally `keep` and `use_channel` (0/1 or TRUE/FALSE). `keep=0` rows are removed before channel matching. Retained names and channel IDs must be unique. TIFF pages follow retained panel order. `use_channel` controls heatmaps, distribution plots and embedding features; all measured markers remain exported and get SNR review and embedding overlays. If absent, all retained markers are selected. `--exclude CD3,CD20` additionally excludes named markers from those feature selections.
+- `panel.csv`: `channel,name`, optionally `keep` and `use_channel` (0/1 or TRUE/FALSE). `keep=0` rows are removed before channel matching. Panel names/channel IDs and intensity headers are trimmed of surrounding whitespace before matching; duplicates remain errors. Retained names and channel IDs must be unique. TIFF pages follow retained panel order. `use_channel` controls heatmaps, distribution plots and embedding features; all measured markers remain exported and get SNR review and embedding overlays. If absent, all retained markers are selected. `--exclude CD3,CD20` additionally excludes named markers from those feature selections.
 - `images.csv`: `image,width_px,height_px`, one row per ROI. ROI IDs are image basenames without their extension; no heuristic extraction of trailing numbers is used.
 - Intensity tables: `Object` and columns matching either panel marker names or channel IDs. Values must be finite and nonnegative. These are typically mean intensities, even though the output calls the raw assay `counts`.
 - Region-property tables: `Object,area`, plus any other consistent measurement columns such as `centroid-0,centroid-1`. Object IDs must be unique within an ROI and match the intensity table exactly. The join uses IDs, not row order. Metadata columns must have a consistent schema across ROIs.
@@ -74,17 +74,17 @@ Rlog is expensive across many cells. `--rlog-max-cells 1000` is a hard guard, no
 
 | Output | What to inspect |
 | --- | --- |
-| Sampled cell heatmaps | Marker coexpression and staining specificity; clustering is restricted to the plotted subset. |
-| ROI mean heatmaps | Mean **transformed** expression by ROI; outliers can be biological or technical. |
-| RGB image previews with white mask outlines | Localization, merged/missed cells, debris and segmentation alignment. Up to three channels; display-only 99th-percentile clipping per image. |
+| Sampled cell heatmaps | `dittoHeatmap` with patient annotations and the reference blue-white-red scale (-4 to 4, saturating outside that range); clustering is restricted to the plotted subset. |
+| ROI mean heatmaps | `dittoHeatmap` of mean **transformed** expression by ROI, viridis legend, and patient/ROI annotations; outliers can be biological or technical. |
+| RGB image previews with white mask outlines | Localization, merged/missed cells, debris and segmentation alignment. Up to three channels, using the reference `cytomapper::plotPixels` approach with its channel color legend and display normalization. |
 | Pixel SNR, unfiltered and signal-filtered | Otsu signal/background ratio per image-marker; compare positive signal intensity as well as ratio. |
 | Coverage, counts and density | Sparse ROIs, filtering impact, and potential segmentation problems. |
 | Cell SNR | Two-component Gaussian mixture on arcsinh expression; raw positive/negative means define SNR. |
 | Cell area distributions | Segmentation or biological size differences; filter threshold shown. |
-| Sample expression boxplots | Staining shifts and population changes. Boxplots replace the reference scripts' ridgelines with a lightweight base-R distribution summary. |
-| UMAP/t-SNE by metadata and all markers | Exploratory mixing/separation, batch patterns and marker localization. |
+| Patient expression distributions | `multi_dittoPlot` ridgelines, as in the reference script, plus the requested grouped boxplots. Each plot type contains all selected markers on one page per transform; all retained cells are used. |
+| UMAP/t-SNE by metadata and all markers | `scater::runUMAP/runTSNE` and `dittoDimPlot`, as in the reference scripts. Paired metadata panels share a page. All marker UMAP panels share one page; all marker t-SNE panels share another, with individual continuous viridis colorbars. |
 
-Each plot has an explanation in both reports. SNR suggestions use configurable `--low-snr 2`, `--high-snr 10`, and `--min-signal 2`. High ratios alone do not demonstrate antibody specificity: low signal or zero background can inflate them. Undefined/constant/failed-mixture markers are explicitly flagged. Infinite SNR remains in CSV, but is excluded from log scatterplots. Potential exclusions are suggestions for inspection, never automatic removal. Thresholds depend on signal units and are not universal biological cutoffs.
+Each plot has an explanation in both reports. Marker grids use four columns and 5-by-4-inch panels, as in the reference script, so a 42-marker grid is a single 20-by-44-inch PDF page. Zoom to read individual panels; HTML figures link to full-size images. Patient grouping uses `patient_id` when supplied, otherwise `sample_name`. SNR suggestions use configurable `--low-snr 2`, `--high-snr 10`, and `--min-signal 2`. High ratios alone do not demonstrate antibody specificity: low signal or zero background can inflate them. Undefined/constant/failed-mixture markers are explicitly flagged. Infinite SNR remains in CSV, but is excluded from log scatterplots. Potential exclusions are suggestions for inspection, never automatic removal. Thresholds depend on signal units and are not universal biological cutoffs.
 
 ## Outputs
 
@@ -95,9 +95,10 @@ Each plot has an explanation in both reports. SNR suggestions use configurable `
 | `matrices/counts_all.csv.gz` | All input cells, before filtering. |
 | `matrices/counts_retained.csv.gz` | Raw retained cells. |
 | `matrices/<transform>.csv.gz` | Transformed retained cells, one cell per row; first column `cell_id`. |
-| `coordinates/<transform>_<UMAP\|TSNE>.csv` | `cell_id,roi_id,sample_name` and two coordinates; sampled cells only. |
+| `coordinates/<transform>_<UMAP\|TSNE>.csv` | `cell_id,roi_id,sample_name,patient_id` and two coordinates; all retained cells by default. |
 | `tables/cells_all.csv` | Metadata, region properties, stable IDs and `kept` filter status. |
 | `tables/roi_qc.csv` | Coverage, before/after counts and density, including empty post-filter ROIs. |
+| `tables/<transform>_embedding_patient_counts.csv` | Numbers of actually embedded/plotted cells per patient. |
 | `tables/*snr*.csv` | Pixel/cell SNR statistics and cell-based marker review. |
 | `tables/<transform>_roi_means.csv` | Marker-by-ROI mean transformed expression. |
 | `objects/qc_data.rds` | Named list of retained counts, cell metadata, panel, selected markers and QC tables. |
@@ -119,9 +120,11 @@ stopifnot(identical(colnames(x), qc$cells$cell_id))
 
 For M markers and N cells, matrix operations and exports are O(MN), with O(MN) memory plus temporary copies; this is not an out-of-core assay engine. Images stream one ROI at a time, adding memory proportional to the largest ROI, rather than the whole image collection. CSV export transposes chunks of 1,000 cells. Arcsinh/z-score transforms are O(MN); DESeq2 rlog can be substantially more expensive.
 
-Cell SNR uses at most `--snr-cells 30000`. Embeddings use a seeded subset of at most `--embedding-cells 30000`, PCA to at most 30 components, approximate UMAP neighbors and Barnes-Hut t-SNE. Coordinates are only returned for those cells; there is no fabricated projection for unsampled cells. Increase the cap to the retained cell count for full coordinates. Perplexity and neighbor counts adapt to small inputs; fewer than five cells or two variable selected markers require `--skip-embeddings`.
+Cell SNR uses at most `--snr-cells 30000`. The default `--embedding-cells 0` means all retained cells, following the original scripts. A positive limit explicitly requests a seeded subset. `scater::runUMAP` and `scater::runTSNE` receive the selected variable markers and transformed assay directly, using their standard preprocessing rather than a separate custom PCA. Perplexity and neighbor counts adapt to small inputs; fewer than five cells or two variable selected markers require `--skip-embeddings`.
 
-Plots use at most `--plot-cells 5000`; clustered cell heatmaps use `--heatmap-cells 500`. Heatmap clustering is quadratic in that cap, and ROI clustering is quadratic in the ROI count. Raising these limits increases costs. Embedding plot cells are the first bounded entries of the seeded embedding subset. Sampling is uniform, so very rare populations may be absent. `--seed` defaults to 220225; embeddings use one thread. Reproducibility also depends on package/platform versions recorded per run. Package versions are not locked.
+All embedded cells are plotted. The earlier report took the first 5,000 cells from sorted embedding IDs, which could omit patients appearing later in the input; this truncation has been removed. `--plot-cells` remains accepted for compatibility but does not truncate marker distributions or embedding plots. Patient-count tables expose the population used in each embedding. If a positive embedding cap is set, sampling may still miss rare populations; the default avoids this.
+
+Clustered cell heatmaps use `--heatmap-cells 500` to bound quadratic clustering memory, while using the original `dittoHeatmap` plotting approach. ROI clustering is also quadratic in ROI count. `--seed` defaults to 220225 and embeddings use one thread. Reproducibility also depends on package/platform versions recorded per run; versions are not locked.
 
 ## Development and checks
 
@@ -131,7 +134,7 @@ Modules are separated into CLI/configuration, IO, transformations, QC, streaming
 Rscript tests/run.R
 ```
 
-Base-R tests cover joins, validation, zero-variance transforms, rlog guards, density/coverage, chunked matrix export, and HTML/PDF generation. Integration checks run when their dependencies are installed and otherwise print explicit skips. GitHub Actions installs analysis dependencies and runs the suite. No patient data is bundled.
+Base-R tests cover joins, validation, zero-variance transforms, rlog guards, density/coverage, chunked matrix export, and HTML/PDF generation. Regression tests also verify that four input-ordered patients remain present in the embedding panels and marker panels have continuous color scales. Integration checks run when their dependencies are installed and otherwise print explicit skips. GitHub Actions installs analysis dependencies and runs the suite. No patient data is bundled.
 
 ## Sources
 

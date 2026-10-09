@@ -43,19 +43,22 @@ image_qc <- function(data, cfg, report) {
     if (nr>1) { d <- mask[-1,,drop=FALSE]!=mask[-nr,,drop=FALSE]; edge[-1,] <- edge[-1,]|d; edge[-nr,] <- edge[-nr,]|d }
     if (nc>1) { d <- mask[,-1,drop=FALSE]!=mask[,-nc,drop=FALSE]; edge[,-1] <- edge[,-1]|d; edge[,-nc] <- edge[,-nc]|d }
     edge <- edge & mask>0
-    rgb <- array(0,c(nr,nc,3))
-    for (j in seq_along(channels)) {
-      v <- img[,,match(channels[j],data$panel$name)]; lim <- as.numeric(stats::quantile(v,.99))
-      if (lim>0) rgb[,,j] <- pmin(v/lim,1)
-    }
-    for (j in 1:3) rgb[,,j][edge] <- 1
-    # EBImage stores x before y; raster uses rows before columns.
-    raster <- as.raster(aperm(rgb,c(2,1,3)))
-    report_plot(report,paste('Segmentation:',roi),paste('RGB channels:',paste(channels,collapse=', '),
-      '. Each channel is clipped at its image-specific 99th percentile for display only. White boundaries show segmented cells. Inspect missed cells, merged cells, debris and marker localization; intensities are not comparable across these rescaled previews.'),function() {
-        graphics::plot.new(); graphics::plot.window(c(0,nr),c(0,nc),asp=1)
-        graphics::rasterImage(raster,0,0,nr,nc); graphics::title(roi)
-      })
+    # Original script's plotPixels approach, including its white outline channel.
+    display <- array(0,c(nr,nc,length(channels)+1L))
+    for (j in seq_along(channels)) display[,,j] <- img[,,match(channels[j],data$panel$name)]
+    display[,,length(channels)+1L] <- edge*.03
+    preview <- cytomapper::CytoImageList(setNames(list(EBImage::Image(display)),roi))
+    cytomapper::channelNames(preview) <- c(channels,'CellOutline')
+    channel_colors <- setNames(lapply(c('red','blue','green')[seq_along(channels)],function(color) c('black',color)),channels)
+    channel_colors$CellOutline <- c('black','white')
+    report_plot(report,paste('Segmentation:',roi),paste('cytomapper plotPixels, following the reference script. Channels:',paste(channels,collapse=', '),
+      '. The displayed color key identifies every channel and the white cell outlines. Image channels are normalized for display by plotPixels; raw values used for SNR are unchanged.'),function() {
+        cytomapper::plotPixels(preview,colour_by=c(channels,'CellOutline'),colour=channel_colors,
+          missing_colour='white',bcg=list(CellOutline=c(0,.3,1)),
+          image_title=list(text=paste('ROI:',roi),cex=.8),
+          legend=list(colour_by.title.cex=.8,colour_by.labels.cex=.8))
+      },width=10,height=10)
+
   }
   do.call(rbind,rows)
 }

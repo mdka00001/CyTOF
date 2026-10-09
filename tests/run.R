@@ -35,27 +35,45 @@ stopifnot(grepl('High SNR',review$review[1]),grepl('low positive',review$review[
 dir.create(file.path(tmp,'report')); dir.create(file.path(tmp,'report','plots'))
 r <- new_report(file.path(tmp,'report'))
 report_text(r,'Test <script>','Escaped & reproducible')
-report_plot(r,'Heatmap','Test explanation',function() plot_heatmap(y[,1:10],'Heatmap'))
-report_plot(r,'One value','Single marker/ROI',function() plot_heatmap(matrix(1,1,1,dimnames=list('M','ROI')),'Single'))
+report_plot(r,'Heatmap','Test explanation',function() graphics::plot(1:10,y[1,1:10]))
+report_plot(r,'One value','Single marker/ROI',function() graphics::plot(1,1))
 finish_report(r)
 stopifnot(file.info(file.path(tmp,'report','report.pdf'))$size>1000,any(grepl('&lt;script&gt;',readLines(file.path(tmp,'report','report.html')),fixed=TRUE)))
 write_csv(data.frame(roi_id='roi_A',sample_name='A'),cfg$samples)
 expect_error(read_input(cfg),'Unmapped')
 write_csv(data.frame(roi_id=c('roi_A','roi_B'),sample_name=c('A','B')),cfg$samples)
-if (requireNamespace('mclust',quietly=TRUE)) {
+plot_deps <- c('dittoSeq','patchwork','ggrastr','viridis','RColorBrewer','SingleCellExperiment')
+have_plots <- all(vapply(plot_deps,requireNamespace,logical(1),quietly=TRUE))
+if (have_plots) {
+  # Four input-ordered patients: the old first-N rendering omitted later groups.
+  meta <- d$cells; meta$patient_id <- rep(paste0('patient_',1:4),each=15)
+  meta <- plot_metadata(meta)
+  obj <- expression_object(y,meta)
+  SingleCellExperiment::reducedDim(obj,'UMAP') <- cbind(seq_len(ncol(obj)),seq_len(ncol(obj)))
+  SingleCellExperiment::reducedDim(obj,'TSNE') <- cbind(seq_len(ncol(obj)),seq_len(ncol(obj)))
+  colors <- plot_colors(meta)
+  p <- embedding_metadata_grid(obj,colors,'patient_id')
+  built <- ggplot2::ggplot_build(p[[1]])
+  stopifnot(nrow(built$data[[1]])==60,length(unique(built$data[[1]]$colour))==4)
+  panel <- embedding_marker_grid(obj,'UMAP')
+  stopifnot(nrow(ggplot2::ggplot_build(panel[[1]])$data[[1]])==60)
+  stopifnot(inherits(panel[[1]]$scales$get_scales('colour'),'ScaleContinuous'))
+  cat('PASS: all four patients and all embedded cells retained, continuous marker color scale\n')
+}
+if (have_plots && requireNamespace('mclust',quietly=TRUE)) {
   run_qc(cfg)
   stopifnot(readLines(file.path(cfg$output,'STATUS'))=='complete')
   expect_error(run_qc(cfg),'must be empty')
   cat('PASS: complete pipeline with image/embedding opt-outs\n')
 } else cat('SKIP: pipeline integration requires mclust\n')
-if (all(vapply(c('mclust','uwot','Rtsne'),requireNamespace,logical(1),quietly=TRUE))) {
+if (have_plots && all(vapply(c('mclust','uwot','Rtsne','scater'),requireNamespace,logical(1),quietly=TRUE))) {
   cfg$output <- file.path(tmp,'with_embeddings'); cfg$skip_embeddings <- FALSE
   run_qc(cfg)
   e <- read.csv(file.path(cfg$output,'coordinates','arcsinh_UMAP.csv'))
   stopifnot(nrow(e)==58,all(is.finite(e$UMAP1)))
   cat('PASS: embedding integration\n')
 } else cat('SKIP: embedding integration requires mclust, uwot, Rtsne\n')
-if (all(vapply(c('mclust','EBImage','tiff'),requireNamespace,logical(1),quietly=TRUE))) {
+if (have_plots && all(vapply(c('mclust','EBImage','tiff','cytomapper'),requireNamespace,logical(1),quietly=TRUE))) {
   dir.create(file.path(tmp,'img')); dir.create(file.path(tmp,'masks'))
   for (roi in c('roi_A','roi_B')) {
     pages <- lapply(1:3,function(j) matrix(runif(400),20,20))

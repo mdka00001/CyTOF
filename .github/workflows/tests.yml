@@ -9,7 +9,7 @@ jobs:
         with:
           use-public-rspm: true
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libfftw3-dev libtiff-dev libcurl4-openssl-dev libxml2-dev libssl-dev
+        run: sudo apt-get update && sudo apt-get install -y libfftw3-dev libtiff-dev libcurl4-openssl-dev libxml2-dev libssl-dev poppler-utils
       - name: Install R dependencies
         run: Rscript scripts/install.R
       - name: Check CLI and tests

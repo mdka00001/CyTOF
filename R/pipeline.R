@@ -15,7 +15,6 @@ run_qc <- function(cfg) {
   saveRDS(cfg,file.path(out,'objects','config.rds'))
   capture.output(dput(cfg),file=file.path(out,'config.txt'))
   report <- new_report(out)
-  on.exit(if (report$pdf %in% grDevices::dev.list()) grDevices::dev.off(report$pdf),add=TRUE)
   report_text(report,'Run overview',c(sprintf('%d markers; %d input cells; %d retained cells; %d ROIs.',nrow(x),ncol(data$counts),ncol(x),nrow(data$images)),
     paste('Transformations:',paste(cfg$transforms,collapse=', ')),
     sprintf('Cells with area < %g pixels excluded. Pixel size: %g micrometers. Seed: %d.',cfg$min_area,cfg$pixel_size,cfg$seed),
@@ -56,39 +55,21 @@ run_qc <- function(cfg) {
       report_plot(report,paste('Pixel-level SNR; signal filter',filtered),paste('Otsu threshold separates signal and background per image/channel. Arithmetic ROI means are plotted on log2 axes. Signal filtering removes ROI-marker pairs with positive signal <=',cfg$min_signal,'. This helps expose inflated SNR from very weak staining. Undefined/infinite points remain in CSV tables.'),function() plot_snr(avg,'Pixel-level SNR'))
     }
   } else report_text(report,'Image QC skipped','Image/mask previews and pixel-level SNR were explicitly disabled.')
-  idx <- sort(sample.int(ncol(x),min(ncol(x),cfg$embedding_cells)))
+  idx <- if (cfg$embedding_cells==0) seq_len(ncol(x)) else sort(sample.int(ncol(x),min(ncol(x),cfg$embedding_cells)))
+  set.seed(cfg$seed)
   hidx <- sort(sample.int(ncol(x),min(ncol(x),cfg$heatmap_cells)))
-  pidx <- sort(sample.int(ncol(x),min(ncol(x),cfg$plot_cells)))
   saveRDS(list(counts=x,cells=cells,panel=data$panel,selected_markers=data$panel$name[data$use],roi_qc=metrics,cell_snr=snr),file.path(out,'objects','qc_data.rds'))
   for (method in cfg$transforms) {
     message('Transforming: ',method)
     y <- transform_counts(x,method,cfg)
     write_matrix(y,file.path(out,'matrices',paste0(method,'.csv.gz')))
     saveRDS(y,file.path(out,'objects',paste0(method,'.rds')))
-    report_plot(report,paste(method,'cell heatmap'),sprintf('Seeded subset of %d retained cells; selected markers only. Rows and columns are clustered within this bounded subset. Values are not additionally scaled. Z-scores describe relative expression across retained cells, not absolute signal.',length(hidx)),function() plot_heatmap(y[data$use,hidx,drop=FALSE],paste(method,'cell heatmap')))
-    groups <- split(seq_len(ncol(y)),cells$roi_id)
-    means <- vapply(groups,function(j) rowMeans(y[,j,drop=FALSE]),numeric(nrow(y)))
-    dimnames(means) <- list(rownames(y),names(groups))
-    write_csv(data.frame(marker=rownames(means),means,check.names=FALSE),file.path(out,'tables',paste0(method,'_roi_means.csv')))
-    report_plot(report,paste(method,'ROI means'),'Mean of transformed retained-cell intensities per ROI (not transform of raw means). Differences may arise from biology, tissue composition or staining. Empty post-filter ROIs are absent here but present in the ROI QC table.',function() plot_heatmap(means[data$use,,drop=FALSE],paste(method,'ROI means'),TRUE))
-    for (m in which(data$use)) {
-      report_plot(report,paste(method,'distribution:',rownames(y)[m]),'Expression distributions by mapped sample in a bounded, seeded subset of retained cells. Shifts can indicate staining differences or different biological cell populations. Boxplots omit outlier points for readability.',function() {
-        graphics::boxplot(split(y[m,pidx],cells$sample_name[pidx]),las=2,outline=FALSE,ylab=method,main=rownames(y)[m])
-      })
-    }
+    emb <- NULL
     if (!cfg$skip_embeddings) {
       emb <- compute_embeddings(y,data$use,cfg,idx)
       saveRDS(emb,file.path(out,'objects',paste0(method,'_embeddings.rds')))
-      eidx <- seq_len(min(length(idx),cfg$plot_cells))
-      for (kind in c('UMAP','TSNE')) {
-        coords <- emb[[kind]]; colnames(coords) <- paste0(kind,1:2)
-        write_csv(data.frame(cell_id=emb$cell_id,roi_id=cells$roi_id[idx],sample_name=cells$sample_name[idx],coords),file.path(out,'coordinates',paste0(method,'_',kind,'.csv')))
-        for (field in intersect(c('sample_name','roi_id','patient_id','indication','batch'),names(cells))) {
-          report_plot(report,paste(method,kind,field),sprintf('Embedding of %d retained cells using selected, variable markers and up to 30 PCs. Plot shows %d cells. Neighbor count=%d; t-SNE perplexity=%g. Separation may reflect biology or batch effects; distances and clusters are exploratory. Unsampled cells have no inferred coordinates.',length(idx),length(eidx),emb$neighbors,emb$perplexity),function() plot_embedding(coords[eidx,,drop=FALSE],cells[[field]][idx[eidx]],paste(method,kind,field)))
-        }
-        for (m in seq_len(nrow(y))) report_plot(report,paste(method,kind,rownames(y)[m]),'The same embedding is colored by transformed marker expression, including markers excluded from embedding construction. The legend shows minimum and maximum plotted values.',function() plot_embedding(coords[eidx,,drop=FALSE],y[m,idx[eidx]],paste(method,kind,rownames(y)[m]),TRUE))
-      }
     }
+    report_expression(report,y,cells,data$use,method,cfg,hidx,emb)
     rm(y); invisible(gc(FALSE))
   }
   if (cfg$skip_embeddings) report_text(report,'Embeddings skipped','UMAP and t-SNE were explicitly disabled.')
