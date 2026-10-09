@@ -16,3 +16,4 @@ jobs:
         run: |
           Rscript bin/cytof-qc.R --help
           Rscript tests/run.R
+          bash tests/install-cli.sh

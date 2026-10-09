@@ -22,6 +22,58 @@ Use an empty/new output directory. `Rscript bin/cytof-qc.R --help` lists all opt
 
 Dependencies: `mclust` for cell SNR; `scater` with `uwot` and `Rtsne` for embeddings; `dittoSeq`, `SingleCellExperiment`, `patchwork`, `ggrastr`, `ggplot2`, `viridis` and `RColorBrewer` for the reference-script plots; `EBImage`, `tiff` and `cytomapper` for image QC; `DESeq2` for optional rlog. `--skip-images` and `--skip-embeddings` explicitly disable those modules and their dependency checks. Skipped modules are identified in the report.
 
+## Install the `cytof-qc` command (TASK 2)
+
+Install a standalone application copy and launcher once, then run `cytof-qc`
+from any working directory. On this workstation:
+
+```sh
+bash scripts/install-cli.sh --rscript /usr/bin/Rscript \
+  --shell-rc "$HOME/.bashrc" --shell-rc "$HOME/.profile"
+export PATH="$HOME/.local/bin:$PATH"
+cytof-qc --help
+cytof-qc --input /path/to/steinbock --samples samples.csv \
+  --output results/run_01 --masks masks_deepcell
+```
+
+The installer defaults to `~/.local/bin/cytof-qc` and copies the application to
+`~/.local/lib/cytof-qc`. No sudo is required. `--shell-rc` adds a PATH entry to
+an explicitly chosen startup file without duplicating it on reinstall. Bash
+interactive sessions read `.bashrc`; login shells typically read `.profile`
+(unless `.bash_profile` or `.bash_login` takes precedence). Use the appropriate
+file for your shell, e.g. `--shell-rc "$HOME/.zshrc"` for zsh. Without
+`--shell-rc`, no startup files are edited. The printed `export PATH=...` command
+activates the installation in an already-open terminal; new terminals load it
+from the configured startup file.
+
+On another machine, omit `--rscript` to select the Rscript currently on PATH,
+or specify its absolute path. The launcher remembers the selected executable,
+so later Conda activation does not silently switch R libraries. R packages
+are installed separately with that same executable and `scripts/install.R`.
+The installer checks that the copied CLI starts, but does not install or
+validate analysis packages; the QC command checks the packages it needs.
+
+Custom location:
+
+```sh
+bash scripts/install-cli.sh --prefix /path/to/prefix --rscript /path/to/Rscript
+export PATH="/path/to/prefix/bin:$PATH"
+```
+
+Run the installer again after changing branches or updating the repository to
+refresh the installed copy. The installed command does not depend on this
+checkout and continues to work if it is moved. Reinstallation replaces only
+paths marked as managed by this installer; unrelated existing commands or
+application directories are rejected. Input/output paths remain relative to
+the directory where you run `cytof-qc`.
+
+To uninstall the default installation, remove `~/.local/bin/cytof-qc` and
+`~/.local/lib/cytof-qc`, then remove lines ending in `# cytof-qc PATH` from the
+startup files you selected. This does not remove R packages or QC results.
+
+Installer tests: `bash tests/install-cli.sh` (override the test R executable
+with `CYTOF_TEST_RSCRIPT=/usr/bin/Rscript`).
+
 ## Input contract
 
 ```text
@@ -34,7 +86,7 @@ steinbock/
   masks/ROI_ID.tiff
 ```
 
-- `panel.csv`: `channel,name`, optionally `keep` and `use_channel` (0/1 or TRUE/FALSE). `keep=0` rows are removed before channel matching. Panel names/channel IDs and intensity headers are trimmed of surrounding whitespace before matching; duplicates remain errors. Retained names and channel IDs must be unique. TIFF pages follow retained panel order. `use_channel` controls heatmaps, distribution plots and embedding features; all measured markers remain exported and get SNR review and embedding overlays. If absent, all retained markers are selected. `--exclude CD3,CD20` additionally excludes named markers from those feature selections.
+- `panel.csv`: `channel,name`, optionally `keep` and `use_channel` (0/1 or TRUE/FALSE). `keep=0` rows are removed before channel matching. Leading/trailing whitespace is trimmed from panel names/channel IDs and intensity headers; ambiguous duplicate names after trimming are rejected. Retained names and channel IDs must be unique. TIFF pages follow retained panel order. `use_channel` controls heatmaps, distribution plots and embedding features; all measured markers remain exported and get SNR review and embedding overlays. If absent, all retained markers are selected. `--exclude CD3,CD20` additionally excludes named markers from those feature selections.
 - `images.csv`: `image,width_px,height_px`, one row per ROI. ROI IDs are image basenames without their extension; no heuristic extraction of trailing numbers is used.
 - Intensity tables: `Object` and columns matching either panel marker names or channel IDs. Values must be finite and nonnegative. These are typically mean intensities, even though the output calls the raw assay `counts`.
 - Region-property tables: `Object,area`, plus any other consistent measurement columns such as `centroid-0,centroid-1`. Object IDs must be unique within an ROI and match the intensity table exactly. The join uses IDs, not row order. Metadata columns must have a consistent schema across ROIs.

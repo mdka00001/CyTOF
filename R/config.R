@@ -7,7 +7,7 @@ default_config <- function() list(input = NULL, samples = NULL, output = NULL,
   exclude = '', image_channels = '', skip_images = FALSE, skip_embeddings = FALSE)
 
 help_text <- function() {
-  cat('CyTOF QC\nUsage: Rscript bin/cytof-qc.R --input DIR --samples mapping.csv --output DIR [options]\n\n')
+  cat('CyTOF QC\nUsage: cytof-qc --input DIR --samples mapping.csv --output DIR [options]\n\n')
   cat('Mapping requires roi_id,sample_name; optional columns are retained.\n')
   for (n in names(default_config())) cat(sprintf('  --%-20s %s\n', gsub('_', '-', n), default_config()[[n]] %||% '(required)'))
   cat('\nBoolean switches take no value. Transform choices: arcsinh,arcsinh_zscore,rlog,rlog_zscore.\nSee README.md for input layout, rlog restrictions and output schemas.\n')
@@ -44,5 +44,14 @@ check_dependencies <- function(cfg) {
   if (!cfg$skip_images) packages <- c(packages, 'EBImage', 'tiff', 'cytomapper')
   if (any(grepl('rlog', cfg$transforms))) packages <- c(packages, 'DESeq2', 'SummarizedExperiment')
   missing <- packages[!vapply(packages, requireNamespace, logical(1), quietly=TRUE)]
-  if (length(missing)) stop('Missing packages: ', paste(missing, collapse=', '), '. Run Rscript scripts/install.R')
+  if (length(missing)) stop(
+    'Packages unavailable in this R session: ', paste(missing, collapse=', '),
+    '\nR version: ', R.version.string,
+    '\nR home: ', R.home(),
+    '\nLibrary paths: ', paste(.libPaths(), collapse='; '),
+    '\nPackages installed in another R installation are not automatically available here.',
+    '\nFrom the repository, reinstall the CLI with: bash scripts/install-cli.sh --rscript /path/to/the/correct/Rscript',
+    '\nOr install dependencies using that same Rscript executable with scripts/install.R.',
+    call.=FALSE)
+
 }

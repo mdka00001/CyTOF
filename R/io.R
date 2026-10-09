@@ -17,9 +17,10 @@ read_input <- function(cfg) {
     panel <- panel[k %in% c('1','true'),,drop=FALSE]
   }
   if (!nrow(panel)) stop('No retained panel channels')
+  # CSV parsers can trim header whitespace differently from field values.
   panel$name <- trimws(as.character(panel$name))
   panel$channel <- trimws(as.character(panel$channel))
-  markers <- panel$name; assert_unique(markers, 'Panel marker names')
+  markers <- panel$name; assert_unique(markers, 'Panel marker names after trimming whitespace')
   assert_unique(panel$channel, 'Panel channels')
   use <- rep(TRUE, nrow(panel))
   if ('use_channel' %in% names(panel)) {
@@ -55,9 +56,11 @@ read_input <- function(cfg) {
     idx <- match(x$Object, props$Object)
     if (anyNA(idx) || nrow(props) != nrow(x)) stop('Intensity/regionprops objects do not match: ', roi)
     names(x) <- trimws(names(x))
-    assert_unique(names(x), paste(roi, 'intensity columns after whitespace trimming'))
+    assert_unique(names(x), paste(roi, 'intensity columns after trimming whitespace'))
     cols <- if (all(markers %in% names(x))) markers else as.character(panel$channel)
-    if (!all(cols %in% names(x))) stop('Intensity columns must match panel names or channels: ', roi)
+    if (!all(cols %in% names(x))) stop('Intensity columns must match panel names or channels: ', roi,
+      '\nMissing marker names: ', paste(setdiff(markers, names(x)), collapse=', '),
+      '\nMissing channel IDs: ', paste(setdiff(as.character(panel$channel), names(x)), collapse=', '))
     if (!all(vapply(x[cols], is.numeric, logical(1)))) stop('Non-numeric intensities: ', roi)
     mat <- t(as.matrix(x[cols])); rownames(mat) <- markers
     if (any(!is.finite(mat)) || any(mat < 0)) stop('Intensities must be finite and nonnegative')
