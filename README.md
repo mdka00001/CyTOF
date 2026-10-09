@@ -168,6 +168,45 @@ umap <- read.csv("results/run_01/coordinates/arcsinh_UMAP.csv")
 stopifnot(identical(colnames(x), qc$cells$cell_id))
 ```
 
+## FCS export (separate subcommand)
+
+TASK 3 adds FCS construction as a separate command. First complete a regular QC
+run, then point the FCS command to its output directory:
+
+```sh
+cytof-qc fcs \
+  --qc-dir results/run_01 \
+  --output results/run_01/fcs \
+  --base arcsinh \
+  --scales minmax,zscore \
+  --area-min 5 --area-max 250 \
+  --split-by time_group
+```
+
+The source assay is `objects/arcsinh.rds` by default; use `--base rlog` after a
+QC run that produced `objects/rlog.rds`. For each selected assay, the command
+writes a combined FCS and, when the `time_group` column exists, one FCS per
+group. If that column is absent, it reports that fact and writes the combined
+file. For example, the dataset mapping used in the supplied workflow has no
+`time_group`, so it produces combined files unless that metadata is added during
+QC. Use `--split-by none` to disable group files explicitly.
+
+The default area filter includes cells with area from 5 through 250, matching
+the supplied script. Filtering occurs before export normalization. `minmax`
+rescales each marker across included cells to [0,1]; constant markers become
+zero. `zscore` standardizes each marker across included cells; constant markers
+become zero. These are generated from the selected QC assay and do not alter
+QC matrices. Choose `--area-min` and `--area-max` to suit the dataset, or use
+`--area-min 0 --area-max <large-value>` to retain all sizes.
+
+FCS events contain every marker, numeric region property and coordinate, plus
+numeric channels for metadata. FCS channels must be numeric; each FCS has a
+matching `_events.csv` sidecar that preserves the original cell IDs and text
+metadata alongside the event row index. The output also contains an
+`included_cells.csv` and a brief `README.txt`. Install the Bioconductor
+`flowCore` package with `Rscript scripts/install.R` before exporting. See
+`cytof-qc fcs --help` for all options.
+
 ## Resource use and reproducibility
 
 For M markers and N cells, matrix operations and exports are O(MN), with O(MN) memory plus temporary copies; this is not an out-of-core assay engine. Images stream one ROI at a time, adding memory proportional to the largest ROI, rather than the whole image collection. CSV export transposes chunks of 1,000 cells. Arcsinh/z-score transforms are O(MN); DESeq2 rlog can be substantially more expensive.

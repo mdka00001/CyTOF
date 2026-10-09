@@ -27,3 +27,7 @@ I need you:
 
 ## TASK 2
 for this task, I want to make this script executable by adding the path to source so I dont need to specify the path every time. Would be best if this can be installed directly to source path and execution ready.
+
+
+## TASK 3
+In this task I want to use the script in /home/md-adnan-karim/Documents/git_repo/CyTOF/1.qc_script_3.R and build another sub-method  separate from the qc method to cytof-qc to construct the fcs files using spe normalized data. Also document it.
