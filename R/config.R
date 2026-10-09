@@ -42,5 +42,14 @@ check_dependencies <- function(cfg) {
   if (!cfg$skip_images) packages <- c(packages, 'EBImage', 'tiff')
   if (any(grepl('rlog', cfg$transforms))) packages <- c(packages, 'DESeq2', 'SummarizedExperiment')
   missing <- packages[!vapply(packages, requireNamespace, logical(1), quietly=TRUE)]
-  if (length(missing)) stop('Missing packages: ', paste(missing, collapse=', '), '. Run Rscript scripts/install.R')
+  if (length(missing)) stop(
+    'Packages unavailable in this R session: ', paste(missing, collapse=', '),
+    '\nR version: ', R.version.string,
+    '\nR home: ', R.home(),
+    '\nLibrary paths: ', paste(.libPaths(), collapse='; '),
+    '\nPackages installed in another R installation are not automatically available here.',
+    '\nFrom the repository, reinstall the CLI with: bash scripts/install-cli.sh --rscript /path/to/the/correct/Rscript',
+    '\nOr install dependencies using that same Rscript executable with scripts/install.R.',
+    call.=FALSE)
+
 }
