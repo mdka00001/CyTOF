@@ -12,6 +12,8 @@ The QC workflow was described here in detail: https://bodenmillergroup.github.io
 
 The script covers most of the steps.
 
+
+## TASK 1
 I need you:
 
 1. Implement a very easy, documented, simply modular executable R application that can be run from CLI.
@@ -21,3 +23,7 @@ I need you:
 5. Give a breif breakdown of markers with high snr score and potential to exclude.
 6. Return the dimentional reduction coordinates, objects, counts matrix.
 7. THe report should be in HTML+PDF format.
+
+
+## TASK 2
+for this task, I want to make this script executable by adding the path to source so I dont need to specify the path every time. Would be best if this can be installed directly to source path and execution ready.

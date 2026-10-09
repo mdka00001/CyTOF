@@ -17,6 +17,27 @@ for (roi in c('roi_A','roi_B')) {
 cfg <- parse_args(c('--input',tmp,'--samples',file.path(tmp,'mapping.csv'),'--output',file.path(tmp,'out'),'--skip-images','--skip-embeddings'))
 d <- read_input(cfg)
 stopifnot(dim(d$counts)==c(3,60),d$cells$sample_name[1]=='A',d$cells$area[1]==1,identical(colnames(d$counts),d$cells$cell_id))
+# Quoted and unquoted CSV headers can preserve whitespace differently.
+panel_path <- file.path(tmp,'panel.csv')
+original_panel <- read_table(panel_path)
+spaced_panel <- original_panel; spaced_panel$name <- c(' CD3 ', 'CD20 ', 'constant')
+write_csv(spaced_panel,panel_path)
+for (roi in c('roi_A','roi_B')) {
+  path <- file.path(tmp,'intensities',paste0(roi,'.csv'))
+  intensity <- read_table(path); names(intensity)[-1] <- c('CD3', ' CD20 ', 'constant')
+  write_csv(intensity,path)
+}
+stopifnot(identical(read_input(cfg)$counts,d$counts))
+bad_panel <- spaced_panel; bad_panel$name[2] <- 'CD3'
+write_csv(bad_panel,panel_path)
+expect_error(read_input(cfg),'unique')
+write_csv(original_panel,panel_path)
+path <- file.path(tmp,'intensities','roi_A.csv')
+intensity <- read_table(path); duplicate <- intensity
+names(duplicate)[3] <- ' CD3 '
+write_csv(duplicate,path)
+expect_error(read_input(cfg),'unique')
+write_csv(intensity,path)
 y <- transform_counts(d$counts,'arcsinh_zscore',cfg)
 stopifnot(max(abs(rowMeans(y)))<1e-12,all(y[3,]==0),abs(sd(y[1,])-1)<1e-12)
 expect_error(validate_rlog(d$counts,1000),'integer counts')
