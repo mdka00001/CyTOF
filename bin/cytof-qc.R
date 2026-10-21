@@ -1,10 +1,21 @@
 #!/usr/bin/env Rscript
 script <- sub('^--file=', '', grep('^--file=', commandArgs(FALSE), value=TRUE)[1])
-# R encodes spaces in --file arguments as ~+~. Decode before resolving modules.
 script <- gsub('~+~', ' ', script, fixed=TRUE)
 root <- dirname(dirname(normalizePath(script, mustWork=TRUE)))
 for (f in c('config','io','transforms','qc','report','plots','images','pipeline','fcs')) source(file.path(root,'R',paste0(f,'.R')))
 args <- commandArgs(TRUE)
+if (length(args) && args[1] == 'python') {
+  py <- Sys.getenv('CYTOF_PYTHON', unset=Sys.getenv('CONDA_PREFIX', ''))
+  if (nzchar(py)) py <- file.path(py, 'bin', 'python')
+  else py <- Sys.which('python3')
+  if (!nzchar(py)) py <- Sys.which('python')
+  if (!nzchar(py)) { message('ERROR: python3 was not found on PATH'); quit(status=1) }
+  root_py <- file.path(root, 'python', 'cytof_qc.py')
+  if (!file.exists(root_py)) root_py <- file.path(dirname(root), 'python', 'cytof_qc.py')
+  if (!file.exists(root_py)) root_py <- file.path(dirname(root), 'lib', 'cytof-qc', 'python', 'cytof_qc.py')
+  status <- system2(py, c(shQuote(root_py), vapply(args[-1], shQuote, character(1))))
+  quit(status=status)
+}
 if (length(args) && args[1]=='fcs') {
   fcs_args <- args[-1]
   if (!length(fcs_args) || '--help' %in% fcs_args || '-h' %in% fcs_args) { fcs_help(); quit(status=0) }

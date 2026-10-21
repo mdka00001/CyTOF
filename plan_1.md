@@ -31,3 +31,7 @@ for this task, I want to make this script executable by adding the path to sourc
 
 ## TASK 3
 In this task I want to use the script in /home/md-adnan-karim/Documents/git_repo/CyTOF/1.qc_script_3.R and build another sub-method  separate from the qc method to cytof-qc to construct the fcs files using spe normalized data. Also document it.
+
+## TASK 4
+I want to add a python version of the same QC and analysis everything as of above using the scanpy - anndata data structure.
+This does not mean to replace the R implementation and keep both executable. Ask for further query regarding the implementation and execution approach.

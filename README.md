@@ -74,6 +74,53 @@ startup files you selected. This does not remove R packages or QC results.
 Installer tests: `bash tests/install-cli.sh` (override the test R executable
 with `CYTOF_TEST_RSCRIPT=/usr/bin/Rscript`).
 
+## Python Scanpy workflow (TASK 4)
+
+The Python implementation is available as `cytof-qc python`; the R workflow
+remains the default `cytof-qc` command. Python code is split into small
+`QCObject` subclasses: `DataInput`, `Analysis`, `ImageQC`, `QCReport`, and
+`Pipeline`. It stores retained cells in an AnnData
+`.h5ad` object, with raw values in `layers['counts']`, each requested transform
+in a named layer, marker metadata in `var`, and cell metadata in `obs`.
+Install Python dependencies in the environment that will run the command:
+
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -r requirements-python.txt
+cytof-qc python --input /path/to/steinbock --samples samples.csv \
+  --output results/python_run --image-channels CD3,CD20,DNA1
+```
+
+You can also invoke the repository script directly with
+`python3 python/cytof_qc.py ...`. It accepts the same Steinbock directory and
+sample mapping contract as the R workflow. It writes HTML/PDF reports, raw and
+transformed matrices, ROI/cell/SNR tables, UMAP/t-SNE coordinates, and
+`objects/qc_data.h5ad`. The R installer copies the Python implementation too;
+its Python dependencies remain installed separately with pip.
+
+The Python workflow supports `arcsinh` and `arcsinh_zscore`. For each transform,
+the report includes Scanpy grouped marker heatmap, dotplot and matrixplot pages,
+in addition to the UMAP/t-SNE marker overlays and grouped distributions.
+`--image-channels` accepts trimmed panel marker names or channel IDs. In the
+provided synovium panel, `CD3` is accepted as an alias for `CD3E`.
+
+Python ROI charts use short sequential labels; `tables/roi_qc.csv` maps them to
+full ROI IDs. Cell SNR is calculated separately on each transformed matrix as
+the two-component mean separation divided by the lower component's standard
+deviation, then plotted on log2 axes. It is scale-invariant, so arcsinh and
+arcsinh+z-score scores should match; near-constant backgrounds are flagged
+instead of producing misleadingly huge values. Pixel SNR uses the same Otsu
+thresholding approach as the R workflow, with log2 signal/SNR plots.
+
+The Python workflow refuses `rlog`
+rather than substituting a different logarithmic transform: DESeq2 rlog is an
+R implementation and requires a separate explicit bridge for parity. Image
+previews use percentile-normalized RGB display and pixel SNR uses an
+upper-quartile threshold; use the R workflow for the existing cytomapper/Otsu
+reference implementation. Python image/plot rendering is a compact native
+implementation, not byte-for-byte plot parity with the R scripts.
+
 ## Input contract
 
 ```text
@@ -86,7 +133,7 @@ steinbock/
   masks/ROI_ID.tiff
 ```
 
-- `panel.csv`: `channel,name`, optionally `keep` and `use_channel` (0/1 or TRUE/FALSE). `keep=0` rows are removed before channel matching. Leading/trailing whitespace is trimmed from panel names/channel IDs and intensity headers; ambiguous duplicate names after trimming are rejected. Retained names and channel IDs must be unique. TIFF pages follow retained panel order. `use_channel` controls heatmaps, distribution plots and embedding features; all measured markers remain exported and get SNR review and embedding overlays. If absent, all retained markers are selected. `--exclude CD3,CD20` additionally excludes named markers from those feature selections.
+- `panel.csv`: `channel,name`, optionally `keep` and `use_channel` (0/1 or TRUE/FALSE). `keep=0` rows are removed before channel matching. Panel names/channel IDs and intensity headers are trimmed of surrounding whitespace before matching; duplicates remain errors. Retained names and channel IDs must be unique. TIFF pages follow retained panel order. `use_channel` controls heatmaps, distribution plots and embedding features; all measured markers remain exported and get SNR review and embedding overlays. If absent, all retained markers are selected. `--exclude CD3,CD20` additionally excludes named markers from those feature selections.
 - `images.csv`: `image,width_px,height_px`, one row per ROI. ROI IDs are image basenames without their extension; no heuristic extraction of trailing numbers is used.
 - Intensity tables: `Object` and columns matching either panel marker names or channel IDs. Values must be finite and nonnegative. These are typically mean intensities, even though the output calls the raw assay `counts`.
 - Region-property tables: `Object,area`, plus any other consistent measurement columns such as `centroid-0,centroid-1`. Object IDs must be unique within an ROI and match the intensity table exactly. The join uses IDs, not row order. Metadata columns must have a consistent schema across ROIs.
@@ -167,45 +214,6 @@ x <- readRDS("results/run_01/objects/arcsinh.rds")
 umap <- read.csv("results/run_01/coordinates/arcsinh_UMAP.csv")
 stopifnot(identical(colnames(x), qc$cells$cell_id))
 ```
-
-## FCS export (separate subcommand)
-
-TASK 3 adds FCS construction as a separate command. First complete a regular QC
-run, then point the FCS command to its output directory:
-
-```sh
-cytof-qc fcs \
-  --qc-dir results/run_01 \
-  --output results/run_01/fcs \
-  --base arcsinh \
-  --scales minmax,zscore \
-  --area-min 5 --area-max 250 \
-  --split-by time_group
-```
-
-The source assay is `objects/arcsinh.rds` by default; use `--base rlog` after a
-QC run that produced `objects/rlog.rds`. For each selected assay, the command
-writes a combined FCS and, when the `time_group` column exists, one FCS per
-group. If that column is absent, it reports that fact and writes the combined
-file. For example, the dataset mapping used in the supplied workflow has no
-`time_group`, so it produces combined files unless that metadata is added during
-QC. Use `--split-by none` to disable group files explicitly.
-
-The default area filter includes cells with area from 5 through 250, matching
-the supplied script. Filtering occurs before export normalization. `minmax`
-rescales each marker across included cells to [0,1]; constant markers become
-zero. `zscore` standardizes each marker across included cells; constant markers
-become zero. These are generated from the selected QC assay and do not alter
-QC matrices. Choose `--area-min` and `--area-max` to suit the dataset, or use
-`--area-min 0 --area-max <large-value>` to retain all sizes.
-
-FCS events contain every marker, numeric region property and coordinate, plus
-numeric channels for metadata. FCS channels must be numeric; each FCS has a
-matching `_events.csv` sidecar that preserves the original cell IDs and text
-metadata alongside the event row index. The output also contains an
-`included_cells.csv` and a brief `README.txt`. Install the Bioconductor
-`flowCore` package with `Rscript scripts/install.R` before exporting. See
-`cytof-qc fcs --help` for all options.
 
 ## Resource use and reproducibility
 

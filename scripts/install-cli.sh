@@ -52,6 +52,8 @@ mkdir "$stage/bin"
 cp -R -- "$source_root/R" "$stage/R"
 cp -- "$source_root/bin/cytof-qc.R" "$stage/bin/"
 cp -- "$source_root/README.md" "$stage/README.md"
+cp -R -- "$source_root/python" "$stage/python"
+cp -- "$source_root/requirements-python.txt" "$stage/requirements-python.txt"
 printf '%s\n' "$marker" > "$stage/.cytof-qc-install"
 # Smoke test the copied application before replacing an installed version.
 "$rscript" "$stage/bin/cytof-qc.R" --help >/dev/null
