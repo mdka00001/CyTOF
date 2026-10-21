@@ -35,3 +35,16 @@ In this task I want to use the script in /home/md-adnan-karim/Documents/git_repo
 ## TASK 4
 I want to add a python version of the same QC and analysis everything as of above using the scanpy - anndata data structure.
 This does not mean to replace the R implementation and keep both executable. Ask for further query regarding the implementation and execution approach.
+
+## TASK 5
+This task should implement methods and a separate pipeline execution arguement that takes multiple *.h5ad objects of choice and integrate them to a single object. The pipeline should run two batch correction methods defined by users:
+    1. scvi integration
+    2. harmony integration
+Run the integration by batch ( here each object shall be considered as a separate batch). Output shall return:
+    1. integrated h5ad file.
+    2. UMAP+TSNE plot for batch, groups (patient/sample).
+    3. Shall plot snr plot.
+    4. shall plot heatmap+dotplot+matrixplot by batch+group+roi.
+    5. shall store the scvi model.
+    6. shall store both scvi/harmony embeddings.
+Use the same abstract object and same code base skeleton for the implementation.
