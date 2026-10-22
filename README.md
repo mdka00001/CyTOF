@@ -147,6 +147,30 @@ per-marker display scaling and sample at most 500 cells for heatmaps. Grouped pl
 `patient_id`, `sample_name`, and `roi_id` columns; `--group-cols` and `--roi-col`
 can select other metadata fields.
 
+### Cluster an AnnData object (TASK 6)
+
+The separate `cluster` command uses an existing PCA, scVI, or Harmony embedding
+to build neighbors, UMAP, and Leiden and/or PhenoGraph-Leiden clusters. With
+`--embedding auto`, it selects `X_scVI`, then `X_pca_harmony`, then `X_pca`; a
+named embedding must exist in `.obsm`. It saves `clustered.h5ad` and UMAP,
+heatmap, dotplot, and matrixplot images in the output directory.
+
+```sh
+pip install -r requirements-clustering.txt
+cytof-qc python cluster --input results/integrated/integrated.h5ad \
+  --output results/clusters --embedding harmony --methods leiden,phenograph
+```
+
+Both methods are selected by default. Use `--methods leiden` or
+`--methods phenograph` to run just one; PhenoGraph uses Scanpy's extension with
+`clustering_algo="leiden"`. PhenoGraph parameters from the Scanpy extension
+are configurable with `--phenograph-*` options (including neighbor count,
+distance metric, graph pruning, partition type, iterations, and jobs). Leiden's
+resolution is set with `--leiden-resolution` (`--resolution` remains an alias);
+it also sets PhenoGraph's resolution unless `--phenograph-resolution` is
+supplied. Advanced Leiden partition arguments can be passed as JSON with
+`--phenograph-options`.
+
 ## Input contract
 
 ```text

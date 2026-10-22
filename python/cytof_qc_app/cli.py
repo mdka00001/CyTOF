@@ -8,6 +8,10 @@ def main():
         from .integration import main as integrate
         integrate(sys.argv[2:])
         return
+    if sys.argv[1:2] == ["cluster"]:
+        from .clustering import main as cluster
+        cluster(sys.argv[2:])
+        return
     parser = argparse.ArgumentParser(description="Scanpy/AnnData CyTOF QC")
     parser.add_argument("--input", required=True)
     parser.add_argument("--samples", required=True)
