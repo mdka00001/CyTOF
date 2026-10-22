@@ -121,6 +121,32 @@ upper-quartile threshold; use the R workflow for the existing cytomapper/Otsu
 reference implementation. Python image/plot rendering is a compact native
 implementation, not byte-for-byte plot parity with the R scripts.
 
+### Integrate existing AnnData objects (TASK 5)
+
+Use `cytof-qc python integrate` to treat each input `.h5ad` as a batch and run
+scVI, Harmony, or both. Inputs are aligned to their shared markers. The output
+contains `integrated.h5ad`, per-method latent embeddings, UMAP/t-SNE plots and
+coordinates by batch/patient/sample/ROI, marker SNR plots, grouped heatmap,
+dotplot and matrixplot images, and the saved scVI model when scVI is selected.
+Install the optional integration dependencies with `pip install scvi-tools
+harmonypy` (or install `requirements-python.txt`).
+
+```sh
+cytof-qc python integrate --inputs sample_a.h5ad sample_b.h5ad \
+  --output results/integrated --methods scvi,harmony
+```
+
+scVI follows the scvi-tools harmonization tutorial: it registers the `counts`
+layer with `batch` and trains an NB model. Each input must therefore provide a
+raw count layer; transformed or scaled values in `X` are not used for scVI.
+Grouped marker plots and SNR reuse an existing `arcsinh_zscore` layer first,
+then `arcsinh`; if neither exists, an `arcsinh` layer is computed as
+`asinh(X / cofactor)` (default cofactor 1). Raw `X` remains unchanged. Set
+`--cofactor` to match your CyTOF workflow. Marker plots use the QC report's
+per-marker display scaling and sample at most 500 cells for heatmaps. Grouped plots use available
+`patient_id`, `sample_name`, and `roi_id` columns; `--group-cols` and `--roi-col`
+can select other metadata fields.
+
 ## Input contract
 
 ```text

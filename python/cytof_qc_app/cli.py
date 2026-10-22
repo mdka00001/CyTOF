@@ -1,10 +1,13 @@
 """Command-line options for the Python QC pipeline."""
 import argparse
-
-from .pipeline import Pipeline
+import sys
 
 
 def main():
+    if sys.argv[1:2] == ["integrate"]:
+        from .integration import main as integrate
+        integrate(sys.argv[2:])
+        return
     parser = argparse.ArgumentParser(description="Scanpy/AnnData CyTOF QC")
     parser.add_argument("--input", required=True)
     parser.add_argument("--samples", required=True)
@@ -30,6 +33,7 @@ def main():
     parser.add_argument("--skip-embeddings", action="store_true")
     args = parser.parse_args()
     try:
+        from .pipeline import Pipeline
         Pipeline(args).run()
     except Exception as error:
         parser.exit(1, f"ERROR: {error}\n")
