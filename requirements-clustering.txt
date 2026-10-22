@@ -1,0 +1,2 @@
+scanpy[leiden]>=1.10
+phenograph>=1.5.3
